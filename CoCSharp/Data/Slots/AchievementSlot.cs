@@ -1,9 +1,10 @@
-﻿using CoCSharp.Networking;
+﻿using CoCSharp.Network;
+using System;
 
 namespace CoCSharp.Data.Slots
 {
     /// <summary>
-    /// Represents a Clash of Clans achievment slot.
+    /// Represents a Clash of Clans achievement slot.
     /// </summary>
     public class AchievementSlot : Slot
     {
@@ -36,8 +37,11 @@ namespace CoCSharp.Data.Slots
         /// <param name="reader">
         /// <see cref="MessageReader"/> that will be used to read the <see cref="AchievementSlot"/>.
         /// </param>
+        /// <exception cref="ArgumentNullException"><paramref name="reader"/> is null.</exception>
         public override void ReadSlot(MessageReader reader)
         {
+            ThrowIfReaderNull(reader);
+
             ID = reader.ReadInt32();
         }
 
@@ -47,8 +51,11 @@ namespace CoCSharp.Data.Slots
         /// <param name="writer">
         /// <see cref="MessageWriter"/> that will be used to write the <see cref="AchievementSlot"/>.
         /// </param>
+        /// <exception cref="ArgumentNullException"><paramref name="writer"/> is null.</exception>
         public override void WriteSlot(MessageWriter writer)
         {
+            ThrowIfWriterNull(writer);
+
             writer.Write(ID);
         }
     }

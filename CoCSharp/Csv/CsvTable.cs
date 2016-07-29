@@ -8,13 +8,15 @@ using System.Text.RegularExpressions;
 namespace CoCSharp.Csv
 {
     /// <summary>
-    /// Represents a Comma Seperated Values(CSV) file as a <see cref="DataTable"/>. 
+    /// Represents a Comma Separated Values(CSV) file as a <see cref="DataTable"/>. 
     /// Mainly designed for the Clash of Clans CSV file format.
     /// </summary>
     public class CsvTable : IDisposable
     {
+        //TODO: Add auto detection of compression.
+
         /// <summary>
-        /// Initalizes a new instance of the <see cref="CsvTable"/> class.
+        /// Initializes a new instance of the <see cref="CsvTable"/> class.
         /// </summary>
         public CsvTable()
         {
@@ -23,7 +25,7 @@ namespace CoCSharp.Csv
 
         /// <summary>
         /// Initializes a new instance of the <see cref="CsvTable"/> class and 
-        /// reads the specified .csv file and parses it.
+        /// reads the specified .csv file and parses it without decompressing it.
         /// </summary>
         /// <param name="path">Path to the .csv file.</param>
         /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
@@ -60,14 +62,17 @@ namespace CoCSharp.Csv
         /// Gets the <see cref="DataTable"/> of the CSV file.
         /// </summary>
         public DataTable Table { get; private set; }
+
         /// <summary>
         /// Gets the rows of the CSV file.
         /// </summary>
         public DataRowCollection Rows { get { return Table.Rows; } }
+
         /// <summary>
         /// Gets the columns of the CSV file.
         /// </summary>
         public DataColumnCollection Columns { get { return Table.Columns; } }
+
         /// <summary>
         /// Gets the row of the CSV file which defines the data types of the columns.
         /// </summary>
@@ -79,6 +84,7 @@ namespace CoCSharp.Csv
         /// <param name="path">Path to the .csv file.</param>
         /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
         /// <exception cref="CsvException">Unexpected data type in CSV table.</exception>
+        /// <exception cref="ObjectDisposedException"><see cref="CsvTable"/> object was disposed.</exception>
         public void Load(string path)
         {
             if (path == null)
@@ -89,13 +95,13 @@ namespace CoCSharp.Csv
         }
 
         /// <summary>
-        /// Reads the specified .csv file from disk and decompresses it if specifed.
+        /// Reads the specified .csv file from disk and decompresses it if specified.
         /// </summary>
         /// <param name="path">Path to the .csv file.</param>
         /// <param name="compressed">Whether the .csv file is compressed or not.</param>
         /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
         /// <exception cref="CsvException">Unexpected data type in CSV table.</exception>
-        /// <exception cref="ObjectDisposedException">CsvTable object was disposed.</exception>
+        /// <exception cref="ObjectDisposedException"><see cref="CsvTable"/> object was disposed.</exception>
         public void Load(string path, bool compressed)
         {
             if (path == null)
@@ -106,12 +112,12 @@ namespace CoCSharp.Csv
         }
 
         /// <summary>
-        /// Reads the specified .csv file from a <see cref="Byte"/> array without compression.
+        /// Reads the specified .csv file from a byte array without compression.
         /// </summary>
-        /// <param name="bytes"><see cref="Byte"/> array of the .csv file.</param>
+        /// <param name="bytes">Bytes array of the .csv file.</param>
         /// <exception cref="ArgumentNullException"><paramref name="bytes"/> is null.</exception>
         /// <exception cref="CsvException">Unexpected data type in CSV table.</exception>
-        /// <exception cref="ObjectDisposedException">CsvTable object was disposed.</exception>
+        /// <exception cref="ObjectDisposedException"><see cref="CsvTable"/> object was disposed.</exception>
         public void Load(byte[] bytes)
         {
             if (_disposed)
@@ -119,19 +125,23 @@ namespace CoCSharp.Csv
             if (bytes == null)
                 throw new ArgumentNullException("bytes");
 
-            var rawCsv = Encoding.UTF8.GetString(bytes); // kinda silly
+            var rawCsv = Encoding.UTF8.GetString(bytes); // kinda silly, cause we already had it as a string
 
-            var rows = Regex.Split(rawCsv.Replace("\"", string.Empty), "\r\n");
+            var eol = GetLineEnding(rawCsv);
+            var rows = Regex.Split(rawCsv.Replace("\"", string.Empty), eol);
             var columnNames = Regex.Split(rows[0], ",");
             var columnTypes = Regex.Split(rows[1], ",");
 
+            // Maybe we should check the line ending consistency?
+
             if (columnNames.Length != columnTypes.Length)
-                throw new CsvException("Number of column and number of ");
+                throw new CsvException("Invalid number of columnNames and columnTypes.");
 
-            // manipulating directly Table is probably a bad idea
-            // might wanna create a new table
+            // Manipulating directly Table is probably a bad idea
+            // might wanna create a new table.
 
-            for (int i = 0; i < columnNames.Length; i++)  // populates datatable's columns loop
+            // The loop that populates datatable's columns.
+            for (int i = 0; i < columnNames.Length; i++)
             {
                 switch (columnTypes[i])
                 {
@@ -154,7 +164,10 @@ namespace CoCSharp.Csv
                 }
             }
 
-            for (int i = 2; i < rows.Length; i++) // turn empty("") fields to DBNull.Value and add them to table loop
+            // The loop that turns empty("") fields to DBNull.Value and add them to table.
+            // Check if the last row is empty, if it is, we ignore it.
+            var count = rows[rows.Length - 1] == string.Empty ? rows.Length - 1 : rows.Length;
+            for (int i = 2; i < count; i++)
             {
                 var rowsValues = (object[])Regex.Split(rows[i], ",");
                 var newRowsValues = new object[rowsValues.Length];
@@ -167,13 +180,13 @@ namespace CoCSharp.Csv
         }
 
         /// <summary>
-        /// Reads the specified .csv file from a byte array and decompresses it if specifed.
+        /// Reads the specified .csv file from a byte array and decompresses it if specified.
         /// </summary>
         /// <param name="bytes">Bytes of the .csv file.</param>
         /// <param name="compressed">Whether the .csv file is compressed or not.</param>
         /// <exception cref="ArgumentNullException"><paramref name="bytes"/> is null.</exception>
         /// <exception cref="CsvException">Unexpected data type in CSV table.</exception>
-        /// <exception cref="ObjectDisposedException">CsvTable object was disposed.</exception>
+        /// <exception cref="ObjectDisposedException"><see cref="CsvTable"/> object was disposed.</exception>
         public void Load(byte[] bytes, bool compressed)
         {
             if (bytes == null)
@@ -183,7 +196,10 @@ namespace CoCSharp.Csv
             {
                 using (var mem = new MemoryStream())
                 {
-                    mem.Write(bytes, 0, 9); // fix the header
+                    // Fix the header by adding 4 bytes at offset 9.
+                    // TODO: Use Buffer.BlockCopy instead of creating a new stream.
+
+                    mem.Write(bytes, 0, 9);
                     mem.Write(new byte[4], 0, 4);
                     mem.Write(bytes, 9, bytes.Length - 9);
                     Load(LzmaUtils.Decompress(mem.ToArray()));
@@ -197,7 +213,7 @@ namespace CoCSharp.Csv
         /// </summary>
         /// <param name="path">Path of the .csv to save to.</param>
         /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
-        /// <exception cref="ObjectDisposedException">CsvTable object was disposed.</exception>
+        /// <exception cref="ObjectDisposedException"><see cref="CsvTable"/> object was disposed.</exception>
         public void Save(string path)
         {
             if (path == null)
@@ -213,7 +229,7 @@ namespace CoCSharp.Csv
         /// <param name="path">Path of the .csv to save to.</param>
         /// <param name="compressed">Whether to compress the file or not.</param>
         /// <exception cref="ArgumentNullException"><paramref name="path"/> is null.</exception>
-        /// <exception cref="ObjectDisposedException">CsvTable object was disposed.</exception>
+        /// <exception cref="ObjectDisposedException"><see cref="CsvTable"/> object was disposed.</exception>
         public void Save(string path, bool compressed)
         {
             if (_disposed)
@@ -221,31 +237,38 @@ namespace CoCSharp.Csv
             if (path == null)
                 throw new ArgumentNullException("path");
 
+            // Write column names.
             var csvBuilder = new StringBuilder();
-            for (int i = 0; i < Table.Columns.Count - 1; i++) // write column names.
+            for (int i = 0; i < Table.Columns.Count - 1; i++)
                 csvBuilder.Append(Columns[i].ColumnName + ",");
             csvBuilder.AppendLine(Columns[Columns.Count - 1].ColumnName);
 
-            for (int i = 0; i < Table.Columns.Count; i++) // write TypesRow
+            // Write column types.
+            for (int i = 0; i < Table.Columns.Count; i++)
             {
-                var format = i == Table.Columns.Count - 1 ? "{0}\r\n" : "{0},"; // check if last in array
+                // Append "\r\n"(new line) if last in array else append ",".
+                var format = i == Table.Columns.Count - 1 ? "{0}\r\n" : "{0},";
                 var dataType = Table.Columns[i].DataType;
                 if (dataType == typeof(int))
                 {
                     csvBuilder.AppendFormat(format, "int");
                     continue;
-                }
+                }// Else
                 csvBuilder.AppendFormat(format, dataType.Name);
             }
 
-            for (int i = 0; i < Table.Rows.Count; i++) // writes all rows
+            // Write all rows.
+            for (int i = 0; i < Table.Rows.Count; i++)
                 csvBuilder.AppendLine(string.Join(",", Table.Rows[i].ItemArray));
 
-            if (compressed) // checks compression
+            // Compress it if specified.
+            if (compressed)
             {
                 var bytes = LzmaUtils.Compress(Encoding.UTF8.GetBytes(csvBuilder.ToString()));
                 using (var mem = new MemoryStream(bytes))
                 {
+                    // Fix the header by removing the 4 bytes at offset 9.
+                    // TODO: Use Buffer.BlockCopy instead of creating new a stream.
                     mem.Write(bytes, 0, 9);
                     mem.Write(bytes, 12, bytes.Length - 13);
                     File.WriteAllBytes(path, mem.ToArray());
@@ -263,7 +286,7 @@ namespace CoCSharp.Csv
         }
 
         /// <summary>
-        /// Releases all unmanged resources and optionally releases managed resources
+        /// Releases all unmanaged resources and optionally releases managed resources
         /// used by the current instance of the <see cref="CsvTable"/> class.
         /// </summary>
         /// <param name="disposing">Releases managed resources if set to <c>true</c>.</param>
@@ -278,6 +301,82 @@ namespace CoCSharp.Csv
                     Table.Dispose();
             }
             _disposed = true;
+        }
+
+        /// <summary>
+        /// Decompresses a CSV table represented by the specified byte array.
+        /// </summary>
+        /// <param name="bytes">Byte array representing the CSV table to decompress.</param>
+        /// <returns>Decompressed byte array.</returns>
+        public static byte[] Decompress(byte[] bytes)
+        {
+            var retBytes = new byte[bytes.Length + 4];
+            Buffer.BlockCopy(bytes, 0, retBytes, 0, 9);
+
+            // Fix the header by adding 4 0x00 bytes at offset 9.
+            Buffer.BlockCopy(bytes, 9, retBytes, 13, bytes.Length - 9);
+            return LzmaUtils.Decompress(retBytes);
+        }
+
+        /// <summary>
+        /// Decompresses a CSV table represented by the specified UTF-8 string.
+        /// </summary>
+        /// <param name="csvString">UTF-8 string representing the CSV table to decompress.</param>
+        /// <returns>Decompressed byte array.</returns>
+        public static byte[] Decompress(string csvString)
+        {
+            return Decompress(Encoding.UTF8.GetBytes(csvString));
+        }
+
+        /// <summary>
+        /// Compresses a CSV table represented by the specified byte array.
+        /// </summary>
+        /// <param name="bytes">Byte array representing the CSV table to compress.</param>
+        /// <returns>Compressed byte array.</returns>
+        public static byte[] Compress(byte[] bytes)
+        {
+            var comBytes = LzmaUtils.Compress(bytes);
+            var retBytes = new byte[comBytes.Length - 4];
+
+            Buffer.BlockCopy(comBytes, 0, retBytes, 0, 9);
+
+            // Patch the header by removing 4 bytes at offset 9.
+            Buffer.BlockCopy(comBytes, 13, retBytes, 9, comBytes.Length - 13);
+            return retBytes;
+        }
+
+        /// <summary>
+        /// Compresses a CSV table represented by the specified string.
+        /// </summary>
+        /// <param name="csvString">UTF-8 string representing the CSV table to compress.</param>
+        /// <returns>Compressed byte array.</returns>
+        public static byte[] Compress(string csvString)
+        {
+            return Compress(Encoding.UTF8.GetBytes(csvString));
+        }
+
+        // Get the line ending of the file depending of the first '\n','\r' characters found.
+        private static string GetLineEnding(string csv)
+        {
+            var indexCR = csv.IndexOf('\r');
+
+            if (indexCR == -1) // Unix
+            {
+                var indexLN = csv.IndexOf('\n');
+                if (indexLN == -1) // No valid ending
+                    throw new FormatException("Unable to identify line ending.");
+                else
+                    return "\n";
+            }
+            else
+            {
+                var nextChar = csv[indexCR + 1];
+
+                if (nextChar == '\n') // Windows
+                    return "\r\n";
+                else // Mac
+                    return "\r";
+            }
         }
     }
 }

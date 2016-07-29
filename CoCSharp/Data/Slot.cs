@@ -1,4 +1,4 @@
-﻿using CoCSharp.Networking;
+﻿using CoCSharp.Network;
 using System;
 
 namespace CoCSharp.Data
@@ -8,6 +8,8 @@ namespace CoCSharp.Data
     /// </summary>
     public abstract class Slot
     {
+        //TODO: Add range check of slot id.
+
         /// <summary>
         /// Initializes a new instance of the <see cref="Slot"/> class.
         /// </summary>
@@ -61,10 +63,13 @@ namespace CoCSharp.Data
         /// <see cref="MessageReader"/> that will be used to read the <see cref="Slot"/> array.
         /// </param>
         /// <returns><see cref="Slot"/> array read.</returns>
+        /// <exception cref="IndexOutOfRangeException">Slot array size read from <paramref name="reader"/> is incorrect.</exception>
         public static T[] ReadSlotArray<T>(MessageReader reader) where T : Slot
         {
             var type = typeof(T);
             var count = reader.ReadInt32();
+            if (count < 0)
+                throw new IndexOutOfRangeException("Invalid slot array size: " + count);
             var array = new T[count];
 
             for (int i = 0; i < count; i++)
@@ -74,6 +79,20 @@ namespace CoCSharp.Data
                 array[i] = instance;
             }
             return array;
+        }
+
+        // Throws ArgumentNullException when reader is null.
+        internal void ThrowIfReaderNull(MessageReader reader)
+        {
+            if (reader == null)
+                throw new ArgumentNullException("reader");
+        }
+
+        // Throws ArgumentNullException when writer is null.
+        internal void ThrowIfWriterNull(MessageWriter writer)
+        {
+            if (writer == null)
+                throw new ArgumentNullException("writer");
         }
     }
 }
